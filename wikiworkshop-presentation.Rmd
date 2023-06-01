@@ -29,6 +29,28 @@ I would like to acknowledge the Traditional Owners of Australia and recognise th
 
 class: inverse, center, middle
 
+# Wikipedia as big data source
+
+---
+
+* Wikipedia offers to everyone with a sufficiently large disk space and computational capacity, multiple **terabytes** of raw text in 
+
+    * *multiple languages*, and about
+    
+    * a diverse range of *topics*.
+    
+* BUT Wikipedia is also a large mass collaboration project, with the goal of creating and curating knowledge about the World. 
+
+## Why is Wikipedia infrastructurally important?
+    
+* BERT and other large language models heavily rely on Wikipedia textual data
+
+* BUT the Internet intended as connected infrastructure also relies on Wikipedia as a source of reliable information and knowledge (e.g. Siri, Google info boxes). 
+
+---
+
+class: inverse, center, middle
+
 # Introduction
 
 ---

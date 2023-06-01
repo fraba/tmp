@@ -45,6 +45,28 @@ I would like to acknowledge the Traditional Owners of Australia and recognise th
 
 class: inverse, center, middle
 
+# Wikipedia as big data source
+
+---
+
+* Wikipedia offers to everyone with a sufficiently large disk space and computational capacity, multiple **terabytes** of raw text in 
+
+    * *multiple languages*, and about
+    
+    * a diverse range of *topics*.
+    
+* BUT Wikipedia is also a large mass collaboration project, with the goal of creating and curating knowledge about the World. 
+
+## Why is Wikipedia infrastructurally important?
+    
+* BERT and other large language models heavily rely on Wikipedia textual data
+
+* BUT the Internet intended as connected infrastructure also relies on Wikipedia as a source of reliable information and knowledge (e.g. Siri, Google info boxes). 
+
+---
+
+class: inverse, center, middle
+
 # Introduction
 
 ---
@@ -62,15 +84,15 @@ We want to use a small sample of editors and their self-disclosed ideological la
 
 ### We train the classifier on editors with manifest (userbox) ideology ...
 
-<div id="htmlwidget-70593a05bf18f106f4f8" style="width:800px;height:500px;" class="grViz html-widget "></div>
-<script type="application/json" data-for="htmlwidget-70593a05bf18f106f4f8">{"x":{"diagram":"digraph {\n  graph [layout = dot, rankdir = LR] \n  \n  node [shape = oval]        \n  nod1 [label = \"Wikipedia:Userboxes/\nPolitics/Ideology\"]\n  \n  nod3 [label = \"Wikipedia:Userboxes\"]\n  nod4 [label = \"Edits:\nText INSERT & DELETE\"]\n  nod5 [label = \"Edits:\nURLs INSERT & DELETE\"]\n  nod6 [label = \"Talk pages:\nEngagement wt other editors\"]\n  \n  node [shape = pentagon]  \n  nod2a [label = \"Editors\n(manifest ideology)\"]\n  \n  node [shape = parallelogram]  \n  nodClass [label = \"Classifier\"]\n  \n  # edge definitions with the node IDs\n  nod1 -> nod2a -> nod3; nod2a -> nod4; nod2a -> nod5; nod2a -> nod6;\n  nod3 -> nodClass; nod4 -> nodClass;  nod5 -> nodClass;  nod6 -> nodClass;\n  nod1 -> nodClass;\n\n  }","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-9461694b6be967f52f36" style="width:800px;height:500px;" class="grViz html-widget "></div>
+<script type="application/json" data-for="htmlwidget-9461694b6be967f52f36">{"x":{"diagram":"digraph {\n  graph [layout = dot, rankdir = LR] \n  \n  node [shape = oval]        \n  nod1 [label = \"Wikipedia:Userboxes/\nPolitics/Ideology\"]\n  \n  nod3 [label = \"Wikipedia:Userboxes\"]\n  nod4 [label = \"Edits:\nText INSERT & DELETE\"]\n  nod5 [label = \"Edits:\nURLs INSERT & DELETE\"]\n  nod6 [label = \"Talk pages:\nEngagement wt other editors\"]\n  \n  node [shape = pentagon]  \n  nod2a [label = \"Editors\n(manifest ideology)\"]\n  \n  node [shape = parallelogram]  \n  nodClass [label = \"Classifier\"]\n  \n  # edge definitions with the node IDs\n  nod1 -> nod2a -> nod3; nod2a -> nod4; nod2a -> nod5; nod2a -> nod6;\n  nod3 -> nodClass; nod4 -> nodClass;  nod5 -> nodClass;  nod6 -> nodClass;\n  nod1 -> nodClass;\n\n  }","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
 
 ---
 
 ### ... to estimate the latent ideology of other editors.
 
-<div id="htmlwidget-fc9161810cd3357189ce" style="width:800px;height:500px;" class="grViz html-widget "></div>
-<script type="application/json" data-for="htmlwidget-fc9161810cd3357189ce">{"x":{"diagram":"digraph {\n  graph [layout = dot, rankdir = LR] \n  \n  node [shape = parallelogram]  \n  nodClass [label = \"Classifier\"]\n  \n  node [shape = oval]        \n  nod3 [label = \"Wikipedia:Userboxes\"]\n  nod4 [label = \"Edits:\nText INSERT & DELETE\"]\n  nod5 [label = \"Edits:\nURLs INSERT & DELETE\"]\n  nod6 [label = \"Talk pages:\nEngagement wt other editors\"]\n  nod7 [label = \"Ideology\n(through classifier)\"]\n  \n  node [shape = pentagon] \n  nod2b [label = \"Editors\n(latent ideology)\"]\n  \n  # edge definitions with the node IDs\n  nodClass -> nod3; nodClass -> nod4; nodClass -> nod5; nodClass -> nod6;\n  nod3 -> nod2b; nod4 -> nod2b; nod5 -> nod2b; nod6 -> nod2b;\n  nod2b -> nod7;\n  nodClass -> nod7;\n\n  }","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-c6c3b2b42f3e48ba668d" style="width:800px;height:500px;" class="grViz html-widget "></div>
+<script type="application/json" data-for="htmlwidget-c6c3b2b42f3e48ba668d">{"x":{"diagram":"digraph {\n  graph [layout = dot, rankdir = LR] \n  \n  node [shape = parallelogram]  \n  nodClass [label = \"Classifier\"]\n  \n  node [shape = oval]        \n  nod3 [label = \"Wikipedia:Userboxes\"]\n  nod4 [label = \"Edits:\nText INSERT & DELETE\"]\n  nod5 [label = \"Edits:\nURLs INSERT & DELETE\"]\n  nod6 [label = \"Talk pages:\nEngagement wt other editors\"]\n  nod7 [label = \"Ideology\n(through classifier)\"]\n  \n  node [shape = pentagon] \n  nod2b [label = \"Editors\n(latent ideology)\"]\n  \n  # edge definitions with the node IDs\n  nodClass -> nod3; nodClass -> nod4; nodClass -> nod5; nodClass -> nod6;\n  nod3 -> nod2b; nod4 -> nod2b; nod5 -> nod2b; nod6 -> nod2b;\n  nod2b -> nod7;\n  nodClass -> nod7;\n\n  }","config":{"engine":"dot","options":null}},"evals":[],"jsHooks":[]}</script>
 
 
 ---
@@ -191,13 +213,13 @@ We utilised the LightGBM flavour&lt;sup&gt;1&lt;/sup&gt; of the FLAML&lt;sup&gt;
 ### Non-political userboxes (interest feature) 
 
 
-|  user_id|userbox                                                |
-|--------:|:------------------------------------------------------|
-|  8302421|{{User de-2}}                                          |
-| 39669392|{{User:Dwscomet/My userbox creations/BritishAmerican}} |
-| 12463948|{{User:Barfbagger/Userboxes/Plaid Cymru}}              |
-| 10005706|{{User:Tal642/my userboxes/Twostate}}                  |
-|  6226598|{{User:UBX/Naturalist}}                                |
+|  user_id|userbox                                                                     |
+|--------:|:---------------------------------------------------------------------------|
+|  6531360|{{User:Xaosflux/UBX/User Cowbell-2}}                                        |
+| 41442651|{{User airport&amp;#124;5&amp;#124;YYZ&amp;#124;Toronto Pearson International Airport}} |
+|  7716687|{{User:Zrs 12/userbox/pi}}                                                  |
+|   782785|{{User wikipedia/AWWDMBJAWGCAWAIFDSPBATDMTD}}                               |
+| 10869265|{{User:J.P.Lon/Userboxes/Human-prehistory}}                                 |
 
 **5-fold ROC AUC**: 0.7366
 
@@ -210,13 +232,13 @@ We utilised the LightGBM flavour&lt;sup&gt;1&lt;/sup&gt; of the FLAML&lt;sup&gt;
 Note: URLs extracted from Diff from difference between new revision and parent revision using the *Match* and *Patch* libraries.
 
 
-|         id|  user_id|action |domain                |
-|----------:|--------:|:------|:---------------------|
-| 1070635016| 36220414|DELETE |www.bristolpost.co.uk |
-| 1073990068| 31195639|INSERT |web.archive.org       |
-| 1073326439| 30380342|DELETE |web.archive.org       |
-| 1095851196| 36898522|DELETE |www.kicker.de         |
-| 1087117417| 41607933|DELETE |www.hurriyet.com.tr   |
+|         id|  user_id|action |domain              |
+|----------:|--------:|:------|:-------------------|
+| 1063971589|  1005449|INSERT |www.theguardian.com |
+| 1066591329|   779224|DELETE |foreignpolicy.com   |
+| 1070635016| 36220414|DELETE |www.channel4.com    |
+| 1103647286| 38123398|DELETE |books.google.com    |
+| 1077735405|  2274507|INSERT |www.telltale.com    |
 
 **5-fold ROC AUC**: 0.56
 
