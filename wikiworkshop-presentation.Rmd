@@ -1,0 +1,671 @@
+---
+title: "Ideology and the collective construction of knowledge of unfolding events on Wikipedia"
+subtitle: ""
+author: "Francesco Bailo (francesco.bailo@sydney.edu.au),$^{1,2}$ Rohit Ram$^{2}$ & Marian-Andrei Rizoiu$^{2}$"
+institute: "$^{1}$School of Social and Political Sciences (University of Sydney) \\ & $^{2}$Behavioral Data Science lab (University of Technology Sydney)"
+date: "`r Sys.Date()`"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    nature:
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = F, message = F, dev = 'svg')
+library(tidyverse)
+library(ggrepel)
+```
+
+---
+
+## Acknowledgement of Country
+
+I would like to acknowledge the Traditional Owners of Australia and recognise their continuing connection to land, water and culture. My home is located on the land of the Gadigal people  of the Eora Nation. I pay my respects to their Elders, past and present.
+
+---
+
+class: inverse, center, middle
+
+# Introduction
+
+---
+
+Political ideology helps us interpret current social arrangements through the lens of our normative ideas, of what these arrangements should be.
+
+--
+
+## Approach
+
+We want to use a small sample of editors and their self-disclosed ideological labels to **train a classifier** to estimate the latent ideological alignment of editors active in editing articles that have appeared during 2022 on the [Portal:Current_events](https://en.wikipedia.org/wiki/Portal:Current_events) page of the English version of the site.
+
+
+---
+
+### We train the classifier on editors with manifest (userbox) ideology ...
+
+```{r echo = F, dev = 'svg'}
+
+library(DiagrammeR)
+
+DiagrammeR::grViz("digraph {
+  graph [layout = dot, rankdir = LR] 
+  
+  node [shape = oval]        
+  nod1 [label = 'Wikipedia:Userboxes/\nPolitics/Ideology']
+  
+  nod3 [label = 'Wikipedia:Userboxes']
+  nod4 [label = 'Edits:\nText INSERT & DELETE']
+  nod5 [label = 'Edits:\nURLs INSERT & DELETE']
+  nod6 [label = 'Talk pages:\nEngagement wt other editors']
+  
+  node [shape = pentagon]  
+  nod2a [label = 'Editors\n(manifest ideology)']
+  
+  node [shape = parallelogram]  
+  nodClass [label = 'Classifier']
+  
+  # edge definitions with the node IDs
+  nod1 -> nod2a -> nod3; nod2a -> nod4; nod2a -> nod5; nod2a -> nod6;
+  nod3 -> nodClass; nod4 -> nodClass;  nod5 -> nodClass;  nod6 -> nodClass;
+  nod1 -> nodClass;
+
+  }", 
+  height =  500, width = 800)
+
+```
+
+---
+
+### ... to estimate the latent ideology of other editors.
+
+```{r echo = F, dev = 'svg'}
+
+DiagrammeR::grViz("digraph {
+  graph [layout = dot, rankdir = LR] 
+  
+  node [shape = parallelogram]  
+  nodClass [label = 'Classifier']
+  
+  node [shape = oval]        
+  nod3 [label = 'Wikipedia:Userboxes']
+  nod4 [label = 'Edits:\nText INSERT & DELETE']
+  nod5 [label = 'Edits:\nURLs INSERT & DELETE']
+  nod6 [label = 'Talk pages:\nEngagement wt other editors']
+  nod7 [label = 'Ideology\n(through classifier)']
+  
+  node [shape = pentagon] 
+  nod2b [label = 'Editors\n(latent ideology)']
+  
+  # edge definitions with the node IDs
+  nodClass -> nod3; nodClass -> nod4; nodClass -> nod5; nodClass -> nod6;
+  nod3 -> nod2b; nod4 -> nod2b; nod5 -> nod2b; nod6 -> nod2b;
+  nod2b -> nod7;
+  nodClass -> nod7;
+
+  }", 
+  height =  500, width = 800)
+
+```
+
+
+---
+
+## Research questions
+
+* RQ1: Do we note a tendency towards homophily in user contributions, with ideology score determining the assortment of users across event articles?
+
+* RQ2: Are users more likely to engage adversarially (through reverting others' edits) across ideological boundaries than within the same boundaries?
+
+* RQ3: Does the contribution from across the ideological spectrum increase the diversity of referenced sources? Does it also increase the use of low-quality sources (i.e. websites not of news, governmental or intergovernmental organisations)?
+
+
+---
+
+class: inverse, center, middle
+
+# Data
+
+---
+
+## Wikipedia dumps
+
+### `enwiki-20221201-pages-meta-current`
+
+* Userboxes: 404,479 editors included at least one userbox on their user page.
+
+### `enwiki-20221201-pages-meta-history`
+
+* Revisions:
+
+    * Text, 
+    
+    * URLs (and domains), 
+    
+    * Talk pages. 
+
+```{r cache = T, eval= F}
+require(readr)
+
+user_userboxes <- 
+  read_csv("user_userboxes.csv")
+
+```
+
+---
+
+## Events
+
+* We identified 124 events for 2022  from [Portal:Current_events](https://en.wikipedia.org/wiki/Portal:Current_events). 
+
+* We collected  91,508 revisions for 96 of these pages. 
+
+```{r}
+
+events <-
+  read.csv("wikipedia_events_2022.csv")
+
+```
+
+```{r fig.width = 9, fig.height=5}
+
+library(DBI)
+library(RSQLite)
+library(ggnetwork)
+
+con <-
+  dbConnect(SQLite(), "revisions_events.sqlite3")
+
+res <- 
+  dbGetQuery(con, 'SELECT user_id, page_id, page_title FROM revision')
+
+dbDisconnect(con)
+
+res %>%
+  dplyr::group_by(page_id) %>%
+  dplyr::count() %>%
+  ggplot(aes(x = page_id, y = n)) +
+  geom_point() +
+  coord_flip() + 
+  theme_bw() + labs(x = "Page IDs", y = "Number of revisions") 
+
+```
+
+
+---
+
+
+class: inverse, center, middle
+
+# Methods
+
+---
+
+## Methods
+
+### We begin by extracting the ground truth for a subset of users. 
+
+The project page [Wikipedia:Userboxes/Politics/Ideology](https://en.wikipedia.org/wiki/Wikipedia:Userboxes/Politics/Ideology) lists 606 boxes.
+
+```{r}
+herr_dori_map.v <- 
+  c("{{User:Madcoverboy/Userboxes/Anti-communist}}" = "anti_communism",
+    "{{User:Jaredscribe/Userbox_anticommunist}}" = "anti_communism",
+    "{{User:Chowbok/Userboxes/Anti-Marxist}}" = "anti_communism",
+    "{{User:Brain40/Userboxes/Anti-communist}}" = "anti_communism",
+    "{{User:UBX/Userboxes/Anti-communism}}" = "anti_communism",        
+    "{{User Nomorecommunism}}" = "anti_communism",
+    "{{User:The Ministry of Truth/Userboxes/Communist}}" = "communism",
+    "{{User:The Dark Side/Original userboxes/communist}}" = "communism",
+    "{{User:Life in General/Userboxes/Communist}}" = "communism",
+    "{{User:UBX/Communist}}" = "communism",
+    "{{User:Whoop whoop pull up/Communist userbox}}" = "communism",  
+    "{{User:The Ministry of Truth/Userboxes/Communist star}}" = "communism",
+    "{{User:Toa Nidhiki05/Userboxes/Communist}}" = "communism",
+    "{{user:Marx.FelipeForte/Userboxes/Communist}}" = "communism",
+    "{{User:Toa Nidhiki05/Userboxes/Libertarian conservative}}" = "conservatism", 
+    "{{User:Life in General/Userboxes/FiscalConservativism}}"  = "conservatism",
+    "{{User:Triadian/Userboxes/Conservative}}"  = "conservatism",
+    "{{User:Toa Nidhiki05/Userboxes/Conservative}}"  = "conservatism", 
+    "{{User:Lucky Mitch/fiscally conservative}}"   = "conservatism",
+    "{{User:MilkyGalactic240/Userboxes/ConservativeTory}}"  = "conservatism",
+    "{{User:M. Armando/userboxes/Liberal conservatism}}" = "liberal_conservatism",
+    "{{User:BenYaMan/Userboxes/LibCon}}" = "liberal_conservatism",
+    "{{User:BrendelSignature/Moderate-liberal}}" = "conservative_liberalism",
+    "{{User:Royalguard11/userboxes/deomocratic socialist}}" = "democratic_socialism",
+    "{{user:UBX/Democratic Socialist}}" = "democratic_socialism",
+    "{{User:WBPchur/UB/Green}}" = "green_politics",
+    "{{User:The Dark Side/Original userboxes/green}}"= "green_politics",
+    "{{User:Ashley Y/Userboxes/Liberal}}" = 'liberalism',
+    "{{User:Zimbabwe is Mine/Userboxes/Unashamed Liberal}}" = 'liberalism',
+    "{{User:Nowyouseeme/Userboxes/liberal}}" = 'liberalism',
+    "{{User:Tl1/Classical liberal}}" = 'liberalism',
+    "{{User:Toa Nidhiki05/Userboxes/Liberal}}" = 'liberalism',
+    "{{User:Life in General/Userboxes/Marxism}}" = 'marxism_leninism',
+    "{{User:Swing Twilight/Userboxes/Marxism–Leninism–Maoism}}" = 'marxism_leninism',
+    "{{User:Yozzer66/userboxes/Marxian Humanist}}"  = 'marxism_leninism',
+    "{{User:UBX/Marxian}}"= 'marxism_leninism',
+    "{{User:MQDuck/userboxes/Marxist}}"  = 'marxism_leninism', 
+    "{{User:Apollonius 1236/userboxes/Marxian}}" = 'marxism_leninism',
+    "{{User:WBPchur/UB/Marxist}}"  = 'marxism_leninism',
+    "{{User:Disavian/Userboxes/User marxist}}"  = 'marxism_leninism',
+    "{{User National Sovereignty}}" = "nationalism",
+    "{{User:The Ministry of Truth/Userboxes/Nationalist}}"  = "nationalism",
+    "{{User Nationalist}}" = "nationalism",
+    "{{User:Nfurry/Userboxes/Nationalist}}" = "nationalism",
+    "{{User:Heuh0/Userboxes/Progressive}}" = "progressivism",
+    "{{User:TVHead/Progressive}}" = 'progressivism',
+    "{{User:Vacant0/Templates/Progressivism}}" = 'progressivism',
+    "{{User:WBPchur/UB/Progressivism}}"  = 'progressivism',
+    "{{User:Rcej/conservative}}" =  'social_conservatism',
+    "{{User:Myrtone86/Social Democrat (OSV)}}" = 'social_democracy',
+    "{{User:WBPchur/UB/Social Democracy}}" = 'social_democracy',   
+    "{{User:Bill Du/socialdemocratic}}" = 'social_democracy',     
+    "{{User:JDuggan/UB/social-democrat}}"  = 'social_democracy',
+    "{{User:Life in General/Userboxes/Social Liberalism}}" = 'social_liberalism',
+    "{{User:Regicollis/Userboxes/Socialist}}" = 'socialism',             
+    "{{User:Toa Nidhiki05/Userboxes/Socialist}}" = 'socialism',         
+    "{{User:Apollonius 1236/userboxes/Socialist}}" = 'socialism',
+    "{{User:JDuggan101/UB/socialism}}" = 'socialism',        
+    "{{User:Revizionist/Socialist}}" = 'socialism'
+  )
+```
+
+
+We were able to associated `r length(herr_dori_map.v)` userboxes to one of `r length(unique(herr_dori_map.v))` ideological labels proposed by Herrmann & Döring (2023). 
+
+---
+
+### Userbox-ideology pairs
+
+```{r out.width = "100%", fig.width=12, fig.height = 9}
+
+library(igraph)
+library(ggnetwork)
+
+g1 <- 
+  data.frame(from = names(herr_dori_map.v),
+             to = herr_dori_map.v) %>%
+  igraph::graph_from_data_frame() 
+
+V(g1)$type <-
+  V(g1)$name %in% herr_dori_map.v
+
+g1 <- 
+  simplify(g1)
+
+ggplot(ggnetwork(g1, layout = igraph::layout_with_kk(g1)), aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_edges(color = "grey50", alpha = 0.5) +
+  geom_nodelabel(aes(x, y, color = type, label = name), size = 4) +
+  scale_color_brewer(palette = "Set1", labels = c("userbox", "ideology")) +
+  theme_blank()
+
+```
+
+---
+
+### Editor-ideology pairs (15 ideologies)
+
+```{r cache = T, out.width = "100%", fig.width=10, fig.height = 7}
+
+library(igraph)
+library(ggnetwork)
+
+g2 <-
+  read.csv("user_selfassigned_ideology.csv") %>%
+  dplyr::filter(!is.na(ideology)) %>%
+  dplyr::select(user_name, ideology) %>%
+  igraph::graph_from_data_frame()
+
+V(g2)$type <- 
+  V(g2)$name %in% herr_dori_map.v
+
+g2 <- 
+  simplify(g2)
+
+ggplot(ggnetwork(g2, layout = igraph::layout_with_kk(g2)), aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_edges(color = "grey50", alpha = 0.5) +
+  geom_nodes(aes(x, y, color = type), size = 3) +
+  scale_color_brewer(palette = "Set1", labels = c("editor", "ideology")) +
+  theme_blank()
+
+```
+
+---
+
+```{r cache = T}
+
+require(rvest)
+
+userboxes <- 
+  c()
+
+urls <- 
+  c("https://en.wikipedia.org/wiki/Wikipedia:Userboxes/Politics/Ideology#Political_ideologies_A%E2%80%93B",
+    "https://en.wikipedia.org/wiki/Wikipedia:Userboxes/Politics/Ideology/02#Political_ideologies_C",
+    "https://en.wikipedia.org/wiki/Wikipedia:Userboxes/Politics/Ideology/03#Political_ideologies_D%E2%80%93L",
+    "https://en.wikipedia.org/wiki/Wikipedia:Userboxes/Politics/Ideology/04#Political_ideologies_M%E2%80%93N",
+    "https://en.wikipedia.org/wiki/Wikipedia:Userboxes/Politics/Ideology/05#Political_ideologies_O%E2%80%93Z"
+  )
+
+for(url in urls) {
+  
+  these <- 
+    url %>%
+    read_html() %>%
+    html_nodes(xpath = "//td[@align='left']/code") %>%
+    html_text()
+  
+  hrefs <- 
+    url %>%
+    read_html() %>%
+    html_nodes(xpath = "//td[@align='left']/code/a") %>%
+    html_attr('href')
+  
+  names(these) <- hrefs
+  
+  userboxes <- 
+    c(userboxes, these)
+  
+}
+
+
+require(readr)
+
+user_latest_pol_userboxes <- 
+  read_csv("user_latest_pol_userbox.csv", 
+                          col_names = FALSE)
+
+user_latest_pol_userboxes$test <- 
+  tolower(user_latest_pol_userboxes$X7) %in% tolower(userboxes)
+# 
+# length(unique(user_latest_pol_userboxes$X2[user_latest_pol_userboxes$test])) / 
+#   length(unique(user_latest_pol_userboxes$X2))
+
+userboxes_ideologies <- 
+  unique(user_latest_pol_userboxes$X7[user_latest_pol_userboxes$test])
+
+g3 <- 
+  user_latest_pol_userboxes %>%
+  dplyr::filter(test) %>%
+  dplyr::distinct(X2, X7 = tolower(X7)) %>%
+  dplyr::filter(X7 != "{{user:disavian/userboxes/politics}}") %>%
+  igraph::graph_from_data_frame()
+
+V(g3)$type <- 
+  grepl("^[[:digit:]]+$",V(g3)$name)
+
+distances.m <- 
+  igraph::distances(g3, v = V(g3)[V(g3)$type == TRUE], to =  V(g3)[V(g3)$type == FALSE])
+
+distances.m <- 
+  distances.m[,tolower(colnames(distances.m)) %in% 
+                tolower(names(herr_dori_map.v))]
+
+res_1 <- 
+  herr_dori_map.v[match(colnames(distances.m),
+                        tolower(names(herr_dori_map.v)))]
+
+positions_tags_m1 <- 
+  read.csv("positions-tags-m1.csv")
+
+scores <- 
+  positions_tags_m1$o[match(res_1, 
+                            positions_tags_m1$ideology)]
+
+distances.m[is.infinite(distances.m)] <- 10
+
+user_ideological_score <- 
+  apply(distances.m, 1, FUN = function(x) weighted.mean(scores, w = 1/(x^(10)), na.rm = T))
+
+user_ideological_score_1 <- 
+  apply(distances.m, 1, FUN = function(x) weighted.mean(scores[x == 1], w = 1/x[x == 1], na.rm = T))
+
+df <-
+  data.frame(score = user_ideological_score,
+             score_1 = user_ideological_score_1,
+             user = rownames(distances.m))
+
+df$score_1_palette <-
+  cut(user_ideological_score_1, breaks = c(-27, -5, -0.00001, 0.00001, 5, 27))
+
+```
+
+### Ideological score of the 15 ideologies (Herrmann & Döring, 2023)
+
+```{r out.width="100%", fig.width = 7, fig.height = 4}
+ggplot(positions_tags_m1 %>%
+         dplyr::filter(ideology %in% herr_dori_map.v),
+       aes(x = o, y = "users", label = ideology)) +
+  # geom_jitter(aes(x = score, y = "users (shortest path)"), width = .5, size = .5, alpha = .5) +
+  geom_point() +
+  geom_hline(yintercept = 0) +
+  geom_label_repel(max.overlaps = 200, force = 1000) +
+  theme_bw() +
+  labs(x = "<= left     Ideological score     right =>", y = NULL) +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_blank()) +
+  guides(colour = FALSE) + 
+  scale_x_continuous(limits = c(-27, 27))
+```
+
+
+---
+
+### Ideological score estimated for 2040 editors base on their userboxes
+
+```{r out.width="100%", fig.width = 7, fig.height = 4}
+require(RColorBrewer)
+
+ggplot(df) +
+  # geom_jitter(aes(x = score, y = "users (shortest path)"), width = .5, size = .5, alpha = .5) +
+  geom_jitter(aes(x = score_1, colour = score_1_palette, y = "users"), width = .5, alpha = .75) +
+  scale_color_manual(values = c("#d6604d", "#f4a582", "#f7f7f7", "#92c5de", "#2166ac"), drop=FALSE) +
+  theme_bw() +
+  labs(x = "<= left     Ideological score     right =>", y = NULL) +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_blank()) +
+  guides(colour = FALSE) + 
+  scale_x_continuous(limits = c(-27, 27))
+```
+
+```{r out.width="100%", fig.width = 7, fig.height = 4, eval = F}
+require(RColorBrewer)
+
+ggplot(df %>%
+         dplyr::mutate(rightleft_bin = ifelse(score_1 > 0, "Right", "Left"))) +
+  # geom_jitter(aes(x = score, y = "users (shortest path)"), width = .5, size = .5, alpha = .5) +
+  geom_vline(xintercept = 0) +
+  geom_jitter(aes(x = score_1, colour = rightleft_bin, y = "users"), width = .5, alpha = .75) +
+  scale_color_brewer(palette = "Set1") +
+  theme_bw() +
+  labs(x = "<= left     Ideological score     right =>", y = NULL, colour = NULL) +
+  theme(axis.text.y = element_blank(), axis.ticks.y = element_blank(),
+        panel.grid.major.y = element_blank()) +
+  scale_x_continuous(limits = c(-27, 27))
+```
+
+---
+
+## Classifier
+
+We utilised the LightGBM flavour<sup>1</sup> of the FLAML<sup>2</sup> classifier architecture. We ran a 5-fold cross-validation using 
+
+* each **feature set** and 
+
+* the **left-right ground truth**.
+
+.footnote[[1] Ke, Guolin, et al. "Lightgbm: A highly efficient gradient boosting decision tree." Advances in neural information processing systems 30 (2017). [2] Wang, Chi, et al. "Flaml: A fast and lightweight automl library." Proceedings of Machine Learning and Systems 3 (2021): 434-447.]
+
+---
+
+## First feature set
+
+### Non-political userboxes (interest feature) 
+
+```{r}
+require(knitr)
+read_csv("user_userboxes_editors_wt_ideology_only.csv") %>%
+  dplyr::filter(!political_userbox) %>%
+  sample_n(5) %>%
+  dplyr::select(user_id, userbox) %>%
+  kable()
+```
+
+**5-fold ROC AUC**: 0.7366
+
+---
+
+## Second feature set
+
+### URLs (sources of information feature) 
+
+Note: URLs extracted from Diff from difference between new revision and parent revision using the *Match* and *Patch* libraries.
+
+```{r}
+require(knitr)
+read_csv("revisions_users_wt_ideology_url_diff.csv", n_max = 1000) %>%
+  sample_n(5) %>%
+  dplyr::select(id, user_id, action, domain) %>%
+  kable()
+```
+
+**5-fold ROC AUC**: 0.56
+
+---
+
+### Preliminary analysis based on manifest ideology of editors
+
+*RQ1: Do we note a tendency towards homophily in user contributions, with ideology score determining the assortment of users across event articles?*
+
+
+```{r}
+
+## Events data
+con <-
+  dbConnect(SQLite(), "revisions_events.sqlite3")
+
+res <- 
+  dbGetQuery(con, 'SELECT id, user_id, page_id, parent_id, minor FROM revision')
+
+dbDisconnect(con)
+
+## User wt ideology data
+
+user_selfassigned_ideology_score <- 
+  read_csv("user_selfassigned_ideology_wt_user_id.csv") %>%
+  dplyr::full_join(read_csv("user_ideological_score_1975_users.csv"),
+                   by = c(userid = 'user')) %>%
+  dplyr::distinct(userid, name, editcount, gender, registration, ideological_score) %>%
+  dplyr::mutate(right = ideological_score > 0) %>%
+  dplyr::filter(!is.na(userid))
+
+res$ideological_score <- 
+  user_selfassigned_ideology_score$ideological_score[match(res$user_id,
+                                                 user_selfassigned_ideology_score$userid)]
+
+```
+
+
+```{r dev = 'svg', fig.width = 6, fig.height=3, out.width = "100%"}
+
+res %>%
+  dplyr::filter(!is.na(ideological_score) & !is.na(user_id)) %>%
+  dplyr::group_by(page_id) %>%
+  dplyr::summarise(`n. edits` = n(),
+                   ideological_score_mean = mean(ideological_score)) %>%
+  ggplot(aes(y = page_id, x = ideological_score_mean, size = `n. edits`)) +
+  geom_point() +
+  scale_x_continuous() +
+  geom_vline(xintercept = 0) +
+  theme_bw() +
+  labs(x = "Average ideology score of edits", y = "Event page ID") 
+```
+
+
+```{r eval = F}
+res %>%
+  dplyr::filter(!is.na(score_1) & !is.na(user_id)) %>%
+  dplyr::group_by(page_id) %>%
+  dplyr::summarise(n = n(),
+                   score_1_mean = mean(score_1)) %>%
+  dplyr::ungroup() %>%
+    dplyr::filter(n > 5) %>%
+  dplyr::summarise(sum(score_1_mean > 0) / n())
+```
+
+
+```{r eval = F}
+res %>%
+  dplyr::filter(!is.na(right_self_or_classified) & !is.na(user_id)) %>%
+  dplyr::group_by(page_id) %>%
+  dplyr::summarise(n = n(),
+                   right_self_or_classified_mean = mean(right_self_or_classified)) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(n > 5) %>%
+  dplyr::summarise(sum(right_self_or_classified_mean > 0.5) / n())
+```
+
+---
+
+*RQ2: Are users more likely to engage adversarially (through reverting others' edits) across ideological boundaries than within the same boundaries?*
+
+We don't have enough ideologically-manifest dyads to answer this (we must rely on the classifier). 
+
+---
+
+*RQ3: Does the contribution from across the ideological spectrum increase the diversity of referenced sources? Does it also increase the use of low-quality sources (i.e. websites not of news, governmental or intergovernmental organisations)?*
+
+```{r  dev = 'svg', fig.width = 6, fig.height=3, out.width = "100%"}
+
+
+con <-
+  dbConnect(SQLite(), "revisions_events.sqlite3")
+
+res <- 
+  dbGetQuery(con, 'SELECT id, user_id, page_id, parent_id, minor FROM revision')
+
+dbDisconnect(con)
+
+res$ideological_score <- 
+  user_selfassigned_ideology_score$ideological_score[match(res$user_id,
+                                                 user_selfassigned_ideology_score$userid)]
+
+require(scales)
+
+res_mean <-
+  res %>%
+  dplyr::group_by(page_id) %>%
+  dplyr::summarise(`n. edits` = n(),
+                   ideological_score_mean = mean(ideological_score, na.rm = T))
+
+revisions_events_url_diff <- 
+  read_csv("revisions_events_url_diff.csv")
+
+revisions_events_url_diff$page_id <- 
+  res$page_id[match(revisions_events_url_diff$id,
+                    res$id)]
+
+revisions_events_url_diff <- 
+  revisions_events_url_diff %>%
+  dplyr::select(page_id, domain) %>%
+  dplyr::distinct()
+
+res_mean <- 
+  res_mean %>%
+  dplyr::left_join(revisions_events_url_diff %>%
+                     dplyr::group_by(page_id) %>%
+                     dplyr::summarise(`n. domains` = n()),
+                   by = c(page_id = "page_id"))
+
+ggplot(res_mean, aes(x = ideological_score_mean, y = `n. domains` / `n. edits`)) +
+  geom_point() +
+  scale_x_continuous() +
+  geom_vline(xintercept = 0) +
+  theme_bw() +
+  labs(x = "Average ideology score of edits", y = "Unique domains over number of edits")
+```
+
+
